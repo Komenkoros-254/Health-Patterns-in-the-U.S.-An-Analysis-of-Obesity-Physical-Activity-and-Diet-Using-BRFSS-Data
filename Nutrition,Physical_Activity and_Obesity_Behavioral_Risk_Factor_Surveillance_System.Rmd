@@ -1,0 +1,187 @@
+---
+title: 'Nutrition, Physical Activity, and Obesity: Behavioral Risk Factor Surveillance
+  System'
+author: "Komen Kipkoros Meshack"
+date: "2026-06-10"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+1. Load packages and data
+library(tidyverse)
+library(janitor)
+library(dplyr)
+library(stringr)
+library(gt)
+library(ggplot2)
+
+df <- read_csv("Nutrition__Physical_Activity__and_Obesity_-_Behavioral_Risk_Factor_Surveillance_System.csv") %>%
+  clean_names()
+2. Data overview
+total_rows <- df %>%
+  filter(total == "Total")
+
+questions <- sort(unique(df$question))
+questions
+
+length(unique(df$location_desc))
+sort(unique(df$year))
+3. Create short question labels
+df <- df %>%
+  mutate(question_short = case_when(
+    str_detect(question, "overweight classification") ~ ">18,Overweight",
+    str_detect(question, "have obesity") ~ ">18,Obesity",
+    str_detect(question, "at least 150 minutes a week") &
+      str_detect(question, "muscle-strengthening activities") ~ "Aerobic150_Muscle",
+    str_detect(question, "at least 150 minutes a week") ~ "Aerobic150",
+    str_detect(question, "more than 300 minutes a week") ~ "Aerobic300",
+    str_detect(question, "muscle-strengthening activities on 2 or more days a week") ~ "Muscle2Plus",
+    str_detect(question, "no leisure-time physical activity") ~ "NoPhysicalActivity",
+    str_detect(question, "consuming fruit less than one time daily") ~ "LowFruit",
+    str_detect(question, "consuming vegetables less than one time daily") ~ "LowVegetable",
+    TRUE ~ "Other"
+  ))
+4. Clean subgroup variables
+df <- df %>%
+  mutate(
+    education = case_when(
+      education == "Some college or technical sch" ~ "Some college or technical school",
+      TRUE ~ education
+    ),
+    income = na_if(income, "Data not reported")
+  )
+
+education_df <- df %>% filter(!is.na(education))
+income_df <- df %>% filter(!is.na(income))
+age_df <- df %>% filter(!is.na(age_years))
+5. Summary table
+summary_table <- df %>%
+  group_by(question_short) %>%
+  summarise(
+    avg_percentage = round(mean(data_value[total == "Total"], na.rm = TRUE), 2),
+    total_sample_size = sum(sample_size[!is.na(stratification_category1)], na.rm = TRUE),
+    n_locations = n_distinct(location_desc),
+    .groups = "drop"
+  )
+
+summary_table
+6. Top 10 locations for each question
+top10_all <- df %>%
+  group_by(question_short, location_desc) %>%
+  summarise(
+    avg_percentage = mean(data_value, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  group_by(question_short) %>%
+  arrange(desc(avg_percentage), .by_group = TRUE) %>%
+  slice_head(n = 10) %>%
+  ungroup()
+
+top10_all
+7. Bottom 5 locations for low fruit and low vegetable consumption
+low_food_bottom5 <- df %>%
+  filter(question_short %in% c("LowFruit", "LowVegetable")) %>%
+  group_by(question_short, location_desc) %>%
+  summarise(avg_percentage = mean(data_value, na.rm = TRUE), .groups = "drop") %>%
+  group_by(question_short) %>%
+  arrange(avg_percentage, .by_group = TRUE) %>%
+  slice_head(n = 5) %>%
+  ungroup()
+
+low_food_bottom5
+8. Save table using gt
+low_food_bottom5_gt <- low_food_bottom5 %>%
+  gt() %>%
+  tab_header(
+    title = "Bottom Five Locations for Low Fruit and Low Vegetable Consumption"
+  )
+
+low_food_bottom5_gt
+9. Obesity trend over time
+df %>%
+  filter(question_short == ">18,Obesity") %>%
+  group_by(year) %>%
+  summarise(avg_value = mean(data_value, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = year, y = avg_value)) +
+  geom_line(color = "red", linewidth = 1) +
+  geom_point() +
+  labs(
+    x = "Year",
+    y = "Average Obesity (%)",
+    title = "Obesity Trend Over Time"
+  ) +
+  theme_minimal()
+10. Top 10 locations by obesity
+df %>%
+  filter(question_short == ">18,Obesity") %>%
+  group_by(location_desc) %>%
+  summarise(avg_value = mean(data_value, na.rm = TRUE), .groups = "drop") %>%
+  arrange(desc(avg_value)) %>%
+  slice_head(n = 10) %>%
+  ggplot(aes(x = reorder(location_desc, avg_value), y = avg_value)) +
+  geom_col(fill = "orange") +
+  coord_flip() +
+  labs(
+    x = "Location",
+    y = "Average Obesity (%)",
+    title = "Top 10 Locations by Obesity"
+  ) +
+  theme_minimal()
+11. Obesity by income group
+df %>%
+  filter(
+    question_short == ">18,Obesity",
+    !is.na(income),
+    trimws(income) != "Data not reported"
+  ) %>%
+  ggplot(aes(x = income, y = data_value)) +
+  geom_boxplot(fill = "orange") +
+  coord_flip() +
+  labs(
+    x = "Income Group",
+    y = "Obesity (%)",
+    title = "Obesity by Income Group"
+  ) +
+  theme_minimal()
+12. Question relationships by age
+age_df %>%
+  group_by(question_short, age_years) %>%
+  summarise(avg_percentage = mean(data_value, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = age_years, y = avg_percentage, fill = question_short)) +
+  geom_col(position = "dodge") +
+  coord_flip() +
+  labs(
+    x = "Age Group",
+    y = "Average Percentage",
+    fill = "Question"
+  ) +
+  theme_minimal()
+13. Question relationships by education
+education_df %>%
+  group_by(question_short, education) %>%
+  summarise(avg_percentage = mean(data_value, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = education, y = avg_percentage, fill = question_short)) +
+  geom_col(position = "dodge") +
+  coord_flip() +
+  labs(
+    x = "Education",
+    y = "Average Percentage",
+    fill = "Question"
+  ) +
+  theme_minimal()
+14. Question relationships by income
+income_df %>%
+  group_by(question_short, income) %>%
+  summarise(avg_percentage = mean(data_value, na.rm = TRUE), .groups = "drop") %>%
+  ggplot(aes(x = income, y = avg_percentage, fill = question_short)) +
+  geom_col(position = "dodge") +
+  coord_flip() +
+  labs(
+    x = "Income",
+    y = "Average Percentage",
+    fill = "Question"
+  ) +
+  theme_minimal()
