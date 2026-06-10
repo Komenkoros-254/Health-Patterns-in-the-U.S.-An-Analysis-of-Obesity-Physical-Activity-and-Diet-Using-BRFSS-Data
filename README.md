@@ -8,7 +8,7 @@ The goal of this project is to explore how these health indicators vary by state
 ## Dataset
 The dataset used in this project is:
 
-**Nutrition, Physical Activity, and Obesity - Behavioral Risk Factor Surveillance System**
+**Nutrition, Physical Activity, and Obesity - Behavioral Risk Factor Surveillance System** obtained from Data.gov
 
 It contains:
 - Year
