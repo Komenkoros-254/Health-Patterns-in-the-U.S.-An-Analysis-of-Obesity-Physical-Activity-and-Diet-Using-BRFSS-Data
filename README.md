@@ -43,8 +43,9 @@ This analysis highlights differences in health outcomes across states and demogr
 
 ## Files in This Repository
 - `analysis.Rmd` — R Markdown analysis file
--Visualizations and outputs/trends
+- `Visualizations and outputs/trends`
 - `README.md` — project overview
+- `Dataset CSV`
 
 ## How to Reproduce
 1. Clone this repository.
